@@ -1,3 +1,7 @@
 data/
 __pycache__/
 big.png
+test data/
+
+*.csv
+*.pkl
