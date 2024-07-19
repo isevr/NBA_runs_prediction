@@ -1,0 +1,13 @@
+digraph Tree {
+node [shape=box, style="filled, rounded", color="black", fontname="helvetica"] ;
+edge [fontname="helvetica"] ;
+0 [label=<Y &le; 0.5<br/>gini = 0.64<br/>samples = 5<br/>value = [2, 2, 1]<br/>class = cat>, fillcolor="#ffffff"] ;
+1 [label=<A &le; 1.5<br/>gini = 0.444<br/>samples = 3<br/>value = [2, 0, 1]<br/>class = cat>, fillcolor="#f2c09c"] ;
+0 -> 1 [labeldistance=2.5, labelangle=45, headlabel="True"] ;
+2 [label=<gini = 0.0<br/>samples = 2<br/>value = [2, 0, 0]<br/>class = cat>, fillcolor="#e58139"] ;
+1 -> 2 ;
+3 [label=<gini = 0.0<br/>samples = 1<br/>value = [0, 0, 1]<br/>class = mouse>, fillcolor="#8139e5"] ;
+1 -> 3 ;
+4 [label=<gini = 0.0<br/>samples = 2<br/>value = [0, 2, 0]<br/>class = dog>, fillcolor="#39e581"] ;
+0 -> 4 [labeldistance=2.5, labelangle=-45, headlabel="False"] ;
+}
