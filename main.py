@@ -9,11 +9,57 @@ from sklearn.preprocessing import LabelEncoder
 from tensorflow.keras.models import load_model
 from sklearn.metrics import classification_report
 from collections import defaultdict
+import seaborn as sns
+import matplotlib.pyplot as plt
+import time
+from fastapi.staticfiles import StaticFiles
+
+
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+
+def performers(events_idx, original_df, event=2):
+    features = ['TimeoutTeam','EnterGame',
+                'LeaveGame','Shooter',
+                'Rebounder', 'Blocker','Fouler',
+                'ReboundType','ViolationPlayer',
+                'FreeThrowShooter','TurnoverPlayer']
+    
+    desired_event = sorted(events_idx, key=lambda k: len(events_idx[k]), reverse=True)[event]
+    
+    a = original_df.loc[events_idx[desired_event]][features]
+    
+    plot_paths = []
+    
+    for i, factor in enumerate(features):
+        value_counts = a[factor].value_counts()
+
+        if value_counts.empty:
+            print(f"No data available for factor: {factor} in event {desired_event}. Skipping plot.")
+            continue        
+
+        plt.figure(figsize=(10, 6))
+        sns.barplot(x=value_counts.index, y=value_counts.values, palette="viridis")
+        plt.title(f'Value Counts for {factor} in Event {desired_event}')
+        plt.xlabel(factor)
+        plt.ylabel('Counts')
+        plt.xticks(rotation=45)
+        
+        plot_path = f'static/plot_{i}.png'
+        plt.savefig(plot_path)
+        plot_paths.append(plot_path)
+        
+        plt.close() 
+        
+    return plot_paths
+
+
 
 def sequence_mining(team, opponent, df):
+    global events_idx
     combined_df = df
     combined_df = combined_df.replace({str(team):'same', str(opponent):'other'}, regex=True)
     
@@ -25,27 +71,26 @@ def sequence_mining(team, opponent, df):
         encoders.append(le)
         df[column] = le.fit_transform(combined_df[column])
 
-    df = pd.concat([df,combined_df.iloc[:,-1]], axis=1)
+    df = pd.concat([df, combined_df.iloc[:, -1]], axis=1)
 
     undersample_len = len(df[df['class'] == 1])
 
-    undersample_df = df[df['class'] == 0 ].sample(n=undersample_len, random_state=43)
+    undersample_df = df[df['class'] == 0].sample(n=undersample_len, random_state=43)
     df = pd.concat([df[df['class'] == 1], undersample_df])
 
-    run_events = {}
-    run_max_counts = []
-
+    events_idx = {}
+    
     sequence_mining_html = ""
-    for j, event in zip(range(12,112,11), range(10, 0, -1)):
+    for j, event in zip(range(12, 112, 11), range(10, 0, -1)):
         a = combined_df.iloc[:, -j:-1][combined_df['class'] == 1]
 
-        # count occurrences of each row
+        # Count occurrences of each row
         row_counts = defaultdict(int)
         for i in range(len(a)):
             row_tuple = tuple(a.iloc[i])
             row_counts[row_tuple] += 1
 
-        # row with the maximum count
+        # Row with the maximum count
         max_count = 0
         mc_row = None
         for row, count in row_counts.items():
@@ -53,14 +98,18 @@ def sequence_mining(team, opponent, df):
                 max_count = count
                 mc_row = row
 
-        # index of the row 
-        mc_idx = a.apply(lambda row: tuple(row) == mc_row, axis=1).idxmax()
+        # Find all indices of the rows that match the row with the maximum count
+        mc_indices = a.apply(lambda row: tuple(row) == mc_row, axis=1)
+        mc_indices = mc_indices[mc_indices].index.tolist()
+
+        events_idx[event] = mc_indices
 
         sequence_mining_html += f"<p><strong>Event: {event}</strong></p>"
-        sequence_mining_html += f"<p>Index: {mc_idx}, Max Count: {max_count}</p>"
-        sequence_mining_html += f"<table class='table table-striped'>{combined_df.iloc[mc_idx, -j:-1].to_frame().dropna().T.to_html()}</table>"
+        sequence_mining_html += f"<p>Indices: {mc_indices}, Max Count: {max_count}</p>"
+        sequence_mining_html += f"<table class='table table-striped'>{combined_df.iloc[mc_indices[0], -j:-1].to_frame().dropna().T.to_html()}</table>"
     
     return sequence_mining_html
+
 
 @app.get("/", response_class=HTMLResponse)
 async def landing_page(request: Request):
@@ -69,16 +118,16 @@ async def landing_page(request: Request):
 @app.post("/analyze", response_class=HTMLResponse)
 async def analyze_team(request: Request, team: str = Form(...)):
     # Load and preprocess data
-    df = pd.read_csv('all_seasons.csv')
+    og_df = pd.read_csv('all_seasons.csv')
 
-    def team_selection(input, df):
-        if input in df.HomeTeam.unique():
-            df = df[df.HomeTeam == input]
+    def team_selection(pref_team, df):
+        if pref_team in df.HomeTeam.unique():
+            df = df[df.HomeTeam == pref_team]
             return df
         else:
             return None
 
-    new_df = team_selection(team, df)
+    new_df = team_selection(team, og_df)
 
     if new_df is None:
         return templates.TemplateResponse("error.html", {"request": request, "message": "Team not found."})
@@ -251,13 +300,16 @@ async def analyze_team(request: Request, team: str = Form(...)):
     report_df = pd.DataFrame(report_dict).transpose()
     report_html = report_df.to_html(classes='table table-striped', header="true", table_id="report_table")
 
-    sequence_mining_html = sequence_mining('home', 'away',df)
+    sequence_mining_html = sequence_mining('home', 'away',combined_df)
+
+    plot_paths = performers(events_idx, og_df)
 
     # Render the template with both the classification report and the sequence mining results
     return templates.TemplateResponse("report.html", {
         "request": request,
         "report_html": report_html,
-        "sequence_mining_html": sequence_mining_html
+        "sequence_mining_html": sequence_mining_html,
+        "plot_paths": plot_paths
     })
 
 

@@ -1,7 +1,7 @@
-<!DOCTYPE html>
+<!-- <!DOCTYPE html>
 <html>
 <head>
-    <title>Classification Report</title>
+    <title>Analysis Results</title>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
 </head>
 <body>
@@ -11,6 +11,39 @@
 
         <h2 class="my-4">Sequence Mining Results</h2>
         <div>{{ sequence_mining_html | safe }}</div>
+
+        <h2 class="my-4">Best Performers Results</h2>
+        {% for plot_path in plot_paths %}
+            <div class="my-2">
+                <img src="{{ plot_path }}" alt="Plot" class="img-fluid">
+            </div>
+        {% endfor %}
+
+        <a href="/" class="btn btn-primary my-4">Back to Home</a>
+    </div>
+</body>
+</html> -->
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Analysis Results</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+</head>
+<body>
+    <div class="container">
+        <h1 class="my-4">Classification Report</h1>
+        <div>{{ report_html | safe }}</div>
+
+        <h2 class="my-4">Sequence Mining Results</h2>
+        <div>{{ sequence_mining_html | safe }}</div>
+
+        <h2 class="my-4">Best Performers Results</h2>
+        {% for plot_path in plot_paths %}
+            <div class="my-2">
+                <img src="{{ plot_path }}" alt="Plot" class="img-fluid">
+            </div>
+        {% endfor %}
 
         <a href="/" class="btn btn-primary my-4">Back to Home</a>
     </div>
