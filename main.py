@@ -25,7 +25,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 
-def performers(events_idx, original_df, event=2):
+def performers(home_runs, original_df, event=2):
     global unique_dir
     features = ['TimeoutTeam','EnterGame',
                 'LeaveGame','Shooter',
@@ -34,8 +34,12 @@ def performers(events_idx, original_df, event=2):
                 'FreeThrowShooter','TurnoverPlayer']
     
     desired_event = sorted(events_idx, key=lambda k: len(events_idx[k]), reverse=True)[event]
-    
-    a = original_df.loc[events_idx[desired_event]][features]
+
+    v = []
+    for run in home_runs:
+        v.append(original_df.loc[run[0]-10:run[0]-1, features])
+
+    a = pd.concat([i for i in v])
 
     unique_dir = f"static/plots_{int(time.time())}_{uuid4().hex}"
     os.makedirs(unique_dir, exist_ok=True)
@@ -43,13 +47,13 @@ def performers(events_idx, original_df, event=2):
     plot_paths = []
     
     for i, factor in enumerate(features):
-        value_counts = a[factor].value_counts()
+        value_counts = a[factor].value_counts().nlargest(n=15)
 
         if value_counts.empty:
             print(f"No data available for factor: {factor} in event {desired_event}. Skipping plot.")
             continue        
 
-        plt.figure(figsize=(10, 6))
+        plt.figure(figsize=(15, 6))
         sns.barplot(x=value_counts.index, y=value_counts.values, palette="viridis")
         plt.title(f'Value Counts for {factor} in Event {desired_event}')
         plt.xlabel(factor)
@@ -68,10 +72,10 @@ def performers(events_idx, original_df, event=2):
 
 def sequence_mining(team, opponent, df):
     global events_idx
-    combined_df = df.iloc[[i[0] for i in home_runs]]
+    combined_df = df
     combined_df = combined_df.replace({str(team):'same', str(opponent):'other'}, regex=True)
     
-    df = pd.DataFrame(index=combined_df.index)
+    df = pd.DataFrame()
     encoders = []
 
     for column in combined_df.columns[:-1]:
@@ -113,7 +117,7 @@ def sequence_mining(team, opponent, df):
         events_idx[event] = mc_indices
 
         sequence_mining_html += f"<p><strong>Event: {event}</strong></p>"
-        sequence_mining_html += f"<p>Indices: {mc_indices}, Max Count: {max_count}</p>"
+        sequence_mining_html += f"<p>Max Count: {max_count}</p>"
         sequence_mining_html += f"<table class='table table-striped'>{combined_df.iloc[mc_indices[0], -j:-1].to_frame().dropna().T.to_html()}</table>"
     
     return sequence_mining_html
@@ -312,7 +316,7 @@ async def analyze_team(request: Request, team: str = Form(...)):
 
     sequence_mining_html = sequence_mining('home', 'away',combined_df)
 
-    plot_paths = performers(events_idx, og_df, event=0)
+    plot_paths = performers(home_runs, og_df, event=0)
 
     # Render the template with both the classification report and the sequence mining results
     return templates.TemplateResponse("report.html", {
