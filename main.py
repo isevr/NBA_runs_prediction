@@ -12,7 +12,10 @@ from collections import defaultdict
 import seaborn as sns
 import matplotlib.pyplot as plt
 import time
+from uuid import uuid4
 from fastapi.staticfiles import StaticFiles
+import os
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 
 
 
@@ -21,7 +24,9 @@ templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
+
 def performers(events_idx, original_df, event=2):
+    global unique_dir
     features = ['TimeoutTeam','EnterGame',
                 'LeaveGame','Shooter',
                 'Rebounder', 'Blocker','Fouler',
@@ -31,6 +36,9 @@ def performers(events_idx, original_df, event=2):
     desired_event = sorted(events_idx, key=lambda k: len(events_idx[k]), reverse=True)[event]
     
     a = original_df.loc[events_idx[desired_event]][features]
+
+    unique_dir = f"static/plots_{int(time.time())}_{uuid4().hex}"
+    os.makedirs(unique_dir, exist_ok=True)
     
     plot_paths = []
     
@@ -48,7 +56,7 @@ def performers(events_idx, original_df, event=2):
         plt.ylabel('Counts')
         plt.xticks(rotation=45)
         
-        plot_path = f'static/plot_{i}.png'
+        plot_path = f'{unique_dir}/plot_{i}.png'
         plt.savefig(plot_path)
         plot_paths.append(plot_path)
         
@@ -60,10 +68,10 @@ def performers(events_idx, original_df, event=2):
 
 def sequence_mining(team, opponent, df):
     global events_idx
-    combined_df = df
+    combined_df = df.iloc[[i[0] for i in home_runs]]
     combined_df = combined_df.replace({str(team):'same', str(opponent):'other'}, regex=True)
     
-    df = pd.DataFrame()
+    df = pd.DataFrame(index=combined_df.index)
     encoders = []
 
     for column in combined_df.columns[:-1]:
@@ -122,10 +130,11 @@ async def analyze_team(request: Request, team: str = Form(...)):
 
     def team_selection(pref_team, df):
         if pref_team in df.HomeTeam.unique():
-            df = df[df.HomeTeam == pref_team]
-            return df
+            pref_df = df[df.HomeTeam == pref_team]
+            return pref_df
         else:
             return None
+        
 
     new_df = team_selection(team, og_df)
 
@@ -243,6 +252,8 @@ async def analyze_team(request: Request, team: str = Form(...)):
 
     runs_iter(new_df, home_runs)
     runs_df.columns = fact_cols
+    runs_df['class'] = runs_df['class'].fillna(1)
+
 
     def no_runs_preprocessing(data, runs):
         global no_runs_split
@@ -277,8 +288,8 @@ async def analyze_team(request: Request, team: str = Form(...)):
     no_runs_optimized(no_runs_preprocessing(new_df, home_runs), factors, fact_cols)
 
     combined_df = pd.concat([runs_df,no_runs_df],ignore_index=True)
-    combined_df.to_csv(str(team)+'_runs.csv', index=False)
-    combined_df = pd.read_csv(str(team)+'_runs.csv')
+    combined_df.to_csv(str(team)+'_runs.csv', index=True)
+    combined_df = pd.read_csv(str(team)+'_runs.csv',index_col=0)
 
 
     df = pd.DataFrame()
@@ -294,7 +305,6 @@ async def analyze_team(request: Request, team: str = Form(...)):
     X = df.iloc[:,:-1].values.reshape(-1,11,10)
     preds = np.argmax(model.predict(X), axis=1)
 
-    df['class'] = df['class'].fillna(0) # to work for now
 
     report_dict = classification_report(df.iloc[:,-1], preds, output_dict=True)
     report_df = pd.DataFrame(report_dict).transpose()
@@ -302,14 +312,15 @@ async def analyze_team(request: Request, team: str = Form(...)):
 
     sequence_mining_html = sequence_mining('home', 'away',combined_df)
 
-    plot_paths = performers(events_idx, og_df)
+    plot_paths = performers(events_idx, og_df, event=0)
 
     # Render the template with both the classification report and the sequence mining results
     return templates.TemplateResponse("report.html", {
         "request": request,
         "report_html": report_html,
         "sequence_mining_html": sequence_mining_html,
-        "plot_paths": plot_paths
+        "plot_paths": plot_paths,
+        "unique_dir": unique_dir
     })
 
 
