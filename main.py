@@ -16,6 +16,8 @@ from uuid import uuid4
 from fastapi.staticfiles import StaticFiles
 import os
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+from preprocessing import data_load
+from model_training import model_training
 
 
 
@@ -126,6 +128,17 @@ def sequence_mining(team, opponent, df):
 @app.get("/", response_class=HTMLResponse)
 async def landing_page(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
+
+@app.post("/model_train", response_class=HTMLResponse)
+async def model_train(request: Request, data: str = Form(...)):
+    pbp_data = data_load(data)  
+    model_training(pbp_data[0], pbp_data[1])
+
+    return templates.TemplateResponse("model_train.html", {
+        "request": request,
+        "training_result": "Model training completed successfully."  
+    })
+
 
 @app.post("/analyze", response_class=HTMLResponse)
 async def analyze_team(request: Request, team: str = Form(...)):
@@ -305,7 +318,7 @@ async def analyze_team(request: Request, team: str = Form(...)):
         df[column] = le.fit_transform(combined_df[column])
 
     df = pd.concat([df,combined_df.iloc[:,-1]],axis=1)
-    model = load_model('pretrained_model_le.keras')
+    model = load_model('runs_predictor.keras')
     X = df.iloc[:,:-1].values.reshape(-1,11,10)
     preds = np.argmax(model.predict(X), axis=1)
 
