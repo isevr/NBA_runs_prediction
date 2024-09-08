@@ -95,6 +95,10 @@ def sequence_mining(team, opponent, df):
     events_idx = {}
     
     sequence_mining_html = ""
+    
+    # Total number of runs (sequences)
+    total_sequences = len(combined_df[combined_df['class'] == 1])
+
     for j, event in zip(range(12, 112, 11), range(10, 0, -1)):
         a = combined_df.iloc[:, -j:-1][combined_df['class'] == 1]
 
@@ -116,13 +120,18 @@ def sequence_mining(team, opponent, df):
         mc_indices = a.apply(lambda row: tuple(row) == mc_row, axis=1)
         mc_indices = mc_indices[mc_indices].index.tolist()
 
+        # Calculate the ratio of the max count to total sequences
+        max_count_ratio = max_count / total_sequences
+
         events_idx[event] = mc_indices
 
-        sequence_mining_html += f"<p><strong>Event: {event}</strong></p>"
+        sequence_mining_html += f"<p><strong>Last {abs(event-11)} events before run</strong></p>"
         sequence_mining_html += f"<p>Max Count: {max_count}</p>"
+        sequence_mining_html += f"<p>Ratio of Max Count to Total Sequences: {max_count_ratio:.2%}</p>"
         sequence_mining_html += f"<table class='table table-striped'>{combined_df.iloc[mc_indices[0], -j:-1].to_frame().dropna().T.to_html()}</table>"
     
     return sequence_mining_html
+
 
 
 @app.get("/", response_class=HTMLResponse)
