@@ -1,3 +1,5 @@
+import os
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 from fastapi import FastAPI, Form
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -14,8 +16,6 @@ import matplotlib.pyplot as plt
 import time
 from uuid import uuid4
 from fastapi.staticfiles import StaticFiles
-import os
-os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 from preprocessing import data_load
 from model_training import model_training
 
@@ -75,8 +75,8 @@ def performers(home_runs, original_df, event=2):
 def sequence_mining(team, opponent, df):
     global events_idx
     combined_df = df
-    combined_df = combined_df.replace({str(team):'same', str(opponent):'other'}, regex=True)
-    
+    combined_df = combined_df.replace({str(team): 'same', str(opponent): 'other'}, regex=True)
+
     df = pd.DataFrame()
     encoders = []
 
@@ -93,11 +93,15 @@ def sequence_mining(team, opponent, df):
     df = pd.concat([df[df['class'] == 1], undersample_df])
 
     events_idx = {}
-    
+
     sequence_mining_html = ""
-    
+
     # Total number of runs (sequences)
     total_sequences = len(combined_df[combined_df['class'] == 1])
+
+    # Prepare lists to store pattern lengths and their corresponding max counts (frequencies)
+    pattern_lengths = []
+    frequencies = []
 
     for j, event in zip(range(12, 112, 11), range(10, 0, -1)):
         a = combined_df.iloc[:, -j:-1][combined_df['class'] == 1]
@@ -125,12 +129,58 @@ def sequence_mining(team, opponent, df):
 
         events_idx[event] = mc_indices
 
+        # Store the pattern length (event) and frequency (max_count) for ideal length calculation
+        pattern_lengths.append(event)
+        frequencies.append(max_count)
+
+        # Add sequence mining results to HTML
         sequence_mining_html += f"<p><strong>Last {abs(event-11)} events before run</strong></p>"
         sequence_mining_html += f"<p>Max Count: {max_count}</p>"
         sequence_mining_html += f"<p>Ratio of Max Count to Total Sequences: {max_count_ratio:.2%}</p>"
-        sequence_mining_html += f"<table class='table table-striped'>{combined_df.iloc[mc_indices[0], -j:-1].to_frame().dropna().T.to_html()}</table>"
-    
+        sequence_mining_html += f"<table class='table table-striped'>{combined_df.iloc[mc_indices[0], -j:-1].to_frame().dropna().T.to_html()}</table>"    # Calculate the ideal pattern length using the scoring function
+    dataset_size = total_sequences
+    ideal_length = ideal_pattern_length(pattern_lengths, frequencies, dataset_size)
+
+    # Add the ideal pattern length to the HTML output
+    sequence_mining_html += f"<p><strong>Suggested Ideal Pattern Length: {abs(ideal_length-11)}</strong></p>"
+
     return sequence_mining_html
+
+
+def ideal_pattern_length(pattern_lengths, frequencies, dataset_size, alpha=0.5, beta=0.3):
+    """
+    Suggests the ideal pattern length based on the trade-off between length and frequency.
+    
+    Parameters:
+    - pattern_lengths: List of pattern lengths (e.g., [10, 9, 8, ..., 1])
+    - frequencies: List of frequencies corresponding to each pattern length
+    - dataset_size: Total size of the dataset
+    - alpha: Weight for frequency (default 0.5)
+    - beta: Weight for the trade-off between length and frequency drop (default 0.3)
+    
+    Returns:
+    - Ideal pattern length
+    """
+    
+    # Normalize frequencies to be relative to dataset size
+    normalized_frequencies = np.array(frequencies) / dataset_size
+    
+    # Calculate the frequency drop between successive lengths
+    frequency_drops = np.diff(normalized_frequencies, prepend=0)
+    
+    # Calculate information gain for each pattern length
+    information_gain = np.array(pattern_lengths) / np.max(pattern_lengths)
+    
+    # Calculate a score for each pattern length based on:
+    # - Normalized frequency
+    # - Drop in frequency compared to previous pattern length
+    # - Information gain (favoring longer patterns)
+    scores = (alpha * normalized_frequencies) + (beta * frequency_drops) + ((1 - alpha - beta) * information_gain)
+    
+    # Choose the pattern length with the highest score
+    ideal_length = pattern_lengths[np.argmax(scores)]
+    
+    return ideal_length
 
 
 
