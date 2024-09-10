@@ -233,7 +233,7 @@ async def analyze_team(request: Request, team: str = Form(...)):
     if new_df is None:
         return templates.TemplateResponse("error.html", {"request": request, "message": "Team not found."})
 
-    # Your existing preprocessing code
+    # preprocessing code
     factors = ['ShotDist','TimeoutTeam','Substitution', 'Shooter',
                'Rebounder', 'Blocker','Fouler',
                'ReboundType','ViolationPlayer',
