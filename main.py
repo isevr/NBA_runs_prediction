@@ -147,17 +147,20 @@ def sequence_mining(team, opponent, df):
     return sequence_mining_html
 
 
-def ideal_pattern_length(pattern_lengths, frequencies, dataset_size, alpha=0.5, beta=0.3):
+def ideal_pattern_length(pattern_lengths, frequencies, dataset_size, alpha=0.5, beta=0.3, length_penalty=0.01, min_frequency_threshold=5):
     """
-    Suggests the ideal pattern length based on the trade-off between length and frequency.
-    
+    Suggests the ideal pattern length based on the trade-off between length and frequency, while heavily penalizing
+    patterns of length 1 and patterns with very low frequency.
+
     Parameters:
     - pattern_lengths: List of pattern lengths (e.g., [10, 9, 8, ..., 1])
     - frequencies: List of frequencies corresponding to each pattern length
     - dataset_size: Total size of the dataset
     - alpha: Weight for frequency (default 0.5)
     - beta: Weight for the trade-off between length and frequency drop (default 0.3)
-    
+    - length_penalty: Strong penalty factor for patterns of length 1 (default 0.01)
+    - min_frequency_threshold: Minimum frequency threshold; patterns with frequencies below this will be heavily penalized (default 5)
+
     Returns:
     - Ideal pattern length
     """
@@ -171,12 +174,25 @@ def ideal_pattern_length(pattern_lengths, frequencies, dataset_size, alpha=0.5, 
     # Calculate information gain for each pattern length
     information_gain = np.array(pattern_lengths) / np.max(pattern_lengths)
     
-    # Calculate a score for each pattern length based on:
-    # - Normalized frequency
-    # - Drop in frequency compared to previous pattern length
-    # - Information gain (favoring longer patterns)
-    scores = (alpha * normalized_frequencies) + (beta * frequency_drops) + ((1 - alpha - beta) * information_gain)
+    # Penalize patterns of length 1 by multiplying their score by a very small penalty factor
+    length_penalties = np.ones_like(pattern_lengths)
+    length_penalties[pattern_lengths == 1] = length_penalty  # Apply strong penalty for length 1
+
+    # Penalize patterns with very low frequency by applying a frequency threshold
+    frequency_penalties = np.ones_like(frequencies)
+    frequency_penalties[np.array(frequencies) < min_frequency_threshold] = 0  # Assign 0 score to low frequencies
+
+    # Calculate the total score for each pattern length
+    scores = (
+        (alpha * normalized_frequencies) + 
+        (beta * frequency_drops) + 
+        ((1 - alpha - beta) * information_gain)
+    ) * length_penalties * frequency_penalties  # Apply both penalties
     
+    # If all scores are zero, avoid selecting a non-informative pattern
+    if np.all(scores == 0):
+        return None  # Return None if no valid patterns exist
+
     # Choose the pattern length with the highest score
     ideal_length = pattern_lengths[np.argmax(scores)]
     
