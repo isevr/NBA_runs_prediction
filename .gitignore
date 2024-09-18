@@ -2,5 +2,9 @@ data/
 __pycache__/
 big.png
 test data/
+gen_sets/
+images/
+models/
+
 
 *.csv
