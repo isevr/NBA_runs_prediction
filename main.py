@@ -72,6 +72,80 @@ def performers(home_runs, original_df, event=2):
 
 
 
+# def sequence_mining(team, opponent, df):
+#     global events_idx
+#     combined_df = df
+#     combined_df = combined_df.replace({str(team): 'same', str(opponent): 'other'}, regex=True)
+
+#     df = pd.DataFrame()
+#     encoders = []
+
+#     for column in combined_df.columns[:-1]:
+#         le = LabelEncoder()
+#         encoders.append(le)
+#         df[column] = le.fit_transform(combined_df[column])
+
+#     df = pd.concat([df, combined_df.iloc[:, -1]], axis=1)
+
+#     undersample_len = len(df[df['class'] == 1])
+
+#     undersample_df = df[df['class'] == 0].sample(n=undersample_len, random_state=43)
+#     df = pd.concat([df[df['class'] == 1], undersample_df])
+
+#     events_idx = {}
+
+#     sequence_mining_html = ""
+
+#     # Total number of runs (sequences)
+#     total_sequences = len(combined_df[combined_df['class'] == 1])
+
+#     # Prepare lists to store pattern lengths and their corresponding max counts (frequencies)
+#     pattern_lengths = []
+#     frequencies = []
+
+#     for j, event in zip(range(12, 112, 11), range(10, 0, -1)):
+#         a = combined_df.iloc[:, -j:-1][combined_df['class'] == 1]
+
+#         # Count occurrences of each row
+#         row_counts = defaultdict(int)
+#         for i in range(len(a)):
+#             row_tuple = tuple(a.iloc[i])
+#             row_counts[row_tuple] += 1
+
+#         # Row with the maximum count
+#         max_count = 0
+#         mc_row = None
+#         for row, count in row_counts.items():
+#             if count > max_count:
+#                 max_count = count
+#                 mc_row = row
+
+#         # Find all indices of the rows that match the row with the maximum count
+#         mc_indices = a.apply(lambda row: tuple(row) == mc_row, axis=1)
+#         mc_indices = mc_indices[mc_indices].index.tolist()
+
+#         # Calculate the ratio of the max count to total sequences
+#         max_count_ratio = max_count / total_sequences
+
+#         events_idx[event] = mc_indices
+
+#         # Store the pattern length (event) and frequency (max_count) for ideal length calculation
+#         pattern_lengths.append(event)
+#         frequencies.append(max_count)
+
+#         # Add sequence mining results to HTML
+#         sequence_mining_html += f"<p><strong>Last {abs(event-11)} events before run</strong></p>"
+#         sequence_mining_html += f"<p>Max Count: {max_count}</p>"
+#         sequence_mining_html += f"<p>Ratio of Max Count to Total Sequences: {max_count_ratio:.2%}</p>"
+#         sequence_mining_html += f"<table class='table table-striped'>{combined_df.iloc[mc_indices[0], -j:-1].to_frame().dropna().T.to_html()}</table>"    # Calculate the ideal pattern length using the scoring function
+#     dataset_size = total_sequences
+#     ideal_length = ideal_pattern_length(pattern_lengths, frequencies, dataset_size)
+
+#     # Add the ideal pattern length to the HTML output
+#     sequence_mining_html += f"<p><strong>Suggested Ideal Pattern Length: {abs(ideal_length-11)}</strong></p>"
+
+#     return sequence_mining_html
+
 def sequence_mining(team, opponent, df):
     global events_idx
     combined_df = df
@@ -112,20 +186,18 @@ def sequence_mining(team, opponent, df):
             row_tuple = tuple(a.iloc[i])
             row_counts[row_tuple] += 1
 
-        # Row with the maximum count
-        max_count = 0
-        mc_row = None
-        for row, count in row_counts.items():
-            if count > max_count:
-                max_count = count
-                mc_row = row
+        # Find the rows with the maximum and second maximum counts
+        sorted_row_counts = sorted(row_counts.items(), key=lambda x: x[1], reverse=True)
+        mc_row, max_count = sorted_row_counts[0]
+        sc_row, second_max_count = sorted_row_counts[1] if len(sorted_row_counts) > 1 else (None, 0)
 
         # Find all indices of the rows that match the row with the maximum count
         mc_indices = a.apply(lambda row: tuple(row) == mc_row, axis=1)
         mc_indices = mc_indices[mc_indices].index.tolist()
 
-        # Calculate the ratio of the max count to total sequences
+        # Calculate the ratios of the max count and second max count to total sequences
         max_count_ratio = max_count / total_sequences
+        second_max_count_ratio = second_max_count / total_sequences if second_max_count > 0 else 0
 
         events_idx[event] = mc_indices
 
@@ -137,7 +209,11 @@ def sequence_mining(team, opponent, df):
         sequence_mining_html += f"<p><strong>Last {abs(event-11)} events before run</strong></p>"
         sequence_mining_html += f"<p>Max Count: {max_count}</p>"
         sequence_mining_html += f"<p>Ratio of Max Count to Total Sequences: {max_count_ratio:.2%}</p>"
-        sequence_mining_html += f"<table class='table table-striped'>{combined_df.iloc[mc_indices[0], -j:-1].to_frame().dropna().T.to_html()}</table>"    # Calculate the ideal pattern length using the scoring function
+        sequence_mining_html += f"<p>Second Max Count: {second_max_count}</p>"
+        sequence_mining_html += f"<p>Ratio of Second Max Count to Total Sequences: {second_max_count_ratio:.2%}</p>"
+        sequence_mining_html += f"<table class='table table-striped'>{combined_df.iloc[mc_indices[0], -j:-1].to_frame().dropna().T.to_html()}</table>"    
+
+    # Calculate the ideal pattern length using the scoring function
     dataset_size = total_sequences
     ideal_length = ideal_pattern_length(pattern_lengths, frequencies, dataset_size)
 
@@ -393,7 +469,7 @@ async def analyze_team(request: Request, team: str = Form(...)):
         df[column] = le.fit_transform(combined_df[column])
 
     df = pd.concat([df,combined_df.iloc[:,-1]],axis=1)
-    model = load_model('runs_predictor.keras')
+    model = load_model('models/runs_predictor.keras')
     X = df.iloc[:,:-1].values.reshape(-1,11,10)
     preds = np.argmax(model.predict(X), axis=1)
 
