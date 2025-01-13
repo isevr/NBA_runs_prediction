@@ -70,82 +70,6 @@ def performers(home_runs, original_df, event=2):
         
     return plot_paths
 
-
-
-# def sequence_mining(team, opponent, df):
-#     global events_idx
-#     combined_df = df
-#     combined_df = combined_df.replace({str(team): 'same', str(opponent): 'other'}, regex=True)
-
-#     df = pd.DataFrame()
-#     encoders = []
-
-#     for column in combined_df.columns[:-1]:
-#         le = LabelEncoder()
-#         encoders.append(le)
-#         df[column] = le.fit_transform(combined_df[column])
-
-#     df = pd.concat([df, combined_df.iloc[:, -1]], axis=1)
-
-#     undersample_len = len(df[df['class'] == 1])
-
-#     undersample_df = df[df['class'] == 0].sample(n=undersample_len, random_state=43)
-#     df = pd.concat([df[df['class'] == 1], undersample_df])
-
-#     events_idx = {}
-
-#     sequence_mining_html = ""
-
-#     # Total number of runs (sequences)
-#     total_sequences = len(combined_df[combined_df['class'] == 1])
-
-#     # Prepare lists to store pattern lengths and their corresponding max counts (frequencies)
-#     pattern_lengths = []
-#     frequencies = []
-
-#     for j, event in zip(range(12, 112, 11), range(10, 0, -1)):
-#         a = combined_df.iloc[:, -j:-1][combined_df['class'] == 1]
-
-#         # Count occurrences of each row
-#         row_counts = defaultdict(int)
-#         for i in range(len(a)):
-#             row_tuple = tuple(a.iloc[i])
-#             row_counts[row_tuple] += 1
-
-#         # Row with the maximum count
-#         max_count = 0
-#         mc_row = None
-#         for row, count in row_counts.items():
-#             if count > max_count:
-#                 max_count = count
-#                 mc_row = row
-
-#         # Find all indices of the rows that match the row with the maximum count
-#         mc_indices = a.apply(lambda row: tuple(row) == mc_row, axis=1)
-#         mc_indices = mc_indices[mc_indices].index.tolist()
-
-#         # Calculate the ratio of the max count to total sequences
-#         max_count_ratio = max_count / total_sequences
-
-#         events_idx[event] = mc_indices
-
-#         # Store the pattern length (event) and frequency (max_count) for ideal length calculation
-#         pattern_lengths.append(event)
-#         frequencies.append(max_count)
-
-#         # Add sequence mining results to HTML
-#         sequence_mining_html += f"<p><strong>Last {abs(event-11)} events before run</strong></p>"
-#         sequence_mining_html += f"<p>Max Count: {max_count}</p>"
-#         sequence_mining_html += f"<p>Ratio of Max Count to Total Sequences: {max_count_ratio:.2%}</p>"
-#         sequence_mining_html += f"<table class='table table-striped'>{combined_df.iloc[mc_indices[0], -j:-1].to_frame().dropna().T.to_html()}</table>"    # Calculate the ideal pattern length using the scoring function
-#     dataset_size = total_sequences
-#     ideal_length = ideal_pattern_length(pattern_lengths, frequencies, dataset_size)
-
-#     # Add the ideal pattern length to the HTML output
-#     sequence_mining_html += f"<p><strong>Suggested Ideal Pattern Length: {abs(ideal_length-11)}</strong></p>"
-
-#     return sequence_mining_html
-
 def sequence_mining(team, opponent, df):
     global events_idx
     combined_df = df
@@ -176,8 +100,12 @@ def sequence_mining(team, opponent, df):
     # Prepare lists to store pattern lengths and their corresponding max counts (frequencies)
     pattern_lengths = []
     frequencies = []
+    freqs = []
 
     for j, event in zip(range(12, 112, 11), range(10, 0, -1)):
+
+        event_dict = {}
+
         a = combined_df.iloc[:, -j:-1][combined_df['class'] == 1]
 
         # Count occurrences of each row
@@ -211,7 +139,17 @@ def sequence_mining(team, opponent, df):
         sequence_mining_html += f"<p>Ratio of Max Count to Total Sequences: {max_count_ratio:.2%}</p>"
         sequence_mining_html += f"<p>Second Max Count: {second_max_count}</p>"
         sequence_mining_html += f"<p>Ratio of Second Max Count to Total Sequences: {second_max_count_ratio:.2%}</p>"
-        sequence_mining_html += f"<table class='table table-striped'>{combined_df.iloc[mc_indices[0], -j:-1].to_frame().dropna().T.to_html()}</table>"    
+        sequence_mining_html += f"<table class='table table-striped'>{combined_df.iloc[mc_indices[0], -j:-1].to_frame().dropna().T.to_html()}</table>"   
+
+        event_dict['Event'] = abs(event-11)
+        event_dict['Frequency'] = max_count
+        event_dict['Ratio'] = np.round(max_count_ratio, 4)
+        event_dict['Sec Frequency'] = second_max_count
+        event_dict['Sec Ratio'] = np.round(second_max_count_ratio, 4)
+
+        freqs.append(event_dict)
+
+    m = pd.DataFrame(freqs) 
 
     # Calculate the ideal pattern length using the scoring function
     dataset_size = total_sequences
@@ -220,8 +158,8 @@ def sequence_mining(team, opponent, df):
     # Add the ideal pattern length to the HTML output
     sequence_mining_html += f"<p><strong>Suggested Ideal Pattern Length: {abs(ideal_length-11)}</strong></p>"
 
-    return sequence_mining_html
 
+    return sequence_mining_html, m
 
 def ideal_pattern_length(pattern_lengths, frequencies, dataset_size, alpha=0.5, beta=0.3, length_penalty=0.01, min_frequency_threshold=5):
     """
@@ -292,9 +230,9 @@ async def model_train(request: Request, data: str = Form(...)):
 
 
 @app.post("/analyze", response_class=HTMLResponse)
-async def analyze_team(request: Request, team: str = Form(...)):
+async def analyze_team(request: Request, team: str = Form(...), season: str = Form(...)):
     # Load and preprocess data
-    og_df = pd.read_csv('all_seasons.csv')
+    og_df = pd.read_csv('data/'+season)
 
     def team_selection(pref_team, df):
         if pref_team in df.HomeTeam.unique():
@@ -305,6 +243,7 @@ async def analyze_team(request: Request, team: str = Form(...)):
         
 
     new_df = team_selection(team, og_df)
+
 
     if new_df is None:
         return templates.TemplateResponse("error.html", {"request": request, "message": "Team not found."})
@@ -478,7 +417,9 @@ async def analyze_team(request: Request, team: str = Form(...)):
     report_df = pd.DataFrame(report_dict).transpose()
     report_html = report_df.to_html(classes='table table-striped', header="true", table_id="report_table")
 
-    sequence_mining_html = sequence_mining('home', 'away',combined_df)
+    sequence_mining_html, df_data = sequence_mining('home', 'away',combined_df)
+
+    df_data = df_data.to_dict(orient="records")
 
     plot_paths = performers(home_runs, og_df, event=0)
 
@@ -488,7 +429,8 @@ async def analyze_team(request: Request, team: str = Form(...)):
         "report_html": report_html,
         "sequence_mining_html": sequence_mining_html,
         "plot_paths": plot_paths,
-        "unique_dir": unique_dir
+        "unique_dir": unique_dir,
+        "dataframe": df_data
     })
 
 

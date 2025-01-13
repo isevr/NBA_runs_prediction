@@ -19,6 +19,27 @@
             </div>
         {% endfor %}
 
+        <h2 class="my-4">Frequencies Dataframe</h2>
+        <h2>Data Table</h2>
+        <table border="1">
+            <thead>
+                <tr>
+                    {% for key in dataframe[0].keys() %}
+                    <th>{{ key }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in dataframe %}
+                <tr>
+                    {% for value in row.values() %}
+                    <td>{{ value }}</td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
         <a href="/" class="btn btn-primary my-4">Back to Home</a>
     </div>
 </body>
