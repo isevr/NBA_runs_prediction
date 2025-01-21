@@ -5,6 +5,7 @@ test data/
 gen_sets/
 images/
 models/
+static/
 
 
 *.csv
