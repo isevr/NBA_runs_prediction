@@ -36,7 +36,7 @@ async def preprocess(request: Request, data: str = Form(...)):
     preprocessed_data.to_csv('pp_data.csv', index=False)
 
 @app.post("/model_train", response_class=HTMLResponse)
-async def model_train(request: Request, data: str = Form(...)):
+async def model_train(request: Request):
     pbp_data = pd.read_csv('pp_data.csv')
     model_training(pbp_data[0], pbp_data[1])
 
@@ -46,6 +46,6 @@ async def model_train(request: Request, data: str = Form(...)):
     })
 
 @app.post("/sequence_mining", response_class=HTMLResponse)
-async def sequence_mining(request: Request, data: str = Form(...)):
+async def sequence_mining(request: Request):
     pbp_data = pd.read_csv('pp_data.csv')
     df = sequence_mining("home", "away", pbp_data, "DET","NBA_PBP_2015-16.csv")
