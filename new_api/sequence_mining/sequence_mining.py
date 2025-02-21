@@ -6,7 +6,7 @@ import numpy as np
 from sklearn.preprocessing import LabelEncoder
 from collections import defaultdict
 
-def sequence_mining(team, opponent, df, curr_team, season):
+def sequence_mining(team, opponent, df, curr_team):
     # Replace team names with generic labels
     combined_df = df.replace({str(team): 'same', str(opponent): 'other'}, regex=True)
     
@@ -74,12 +74,12 @@ def sequence_mining(team, opponent, df, curr_team, season):
         try:
             event_dict['Sequence'] = str(combined_df.iloc[mc_indices[0], -j:-1].to_frame().dropna().T.to_dict(orient="records"))
         except IndexError:
-            print(mc_indices, j, curr_team, season)
+            print(mc_indices, j, curr_team)
 
         try:
             event_dict['Sec Sequence'] = str(combined_df.iloc[sc_indices[0], -j:-1].to_frame().dropna().T.to_dict(orient="records"))
         except IndexError:
-            print(sc_indices, j, curr_team, season)
+            print(sc_indices, j, curr_team)
         
         freqs.append(event_dict)
     

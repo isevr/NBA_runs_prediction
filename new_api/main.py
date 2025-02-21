@@ -1,7 +1,7 @@
 import os
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
-from fastapi import FastAPI, Form
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Form, File, UploadFile
+from fastapi.responses import HTMLResponse, Response, JSONResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.requests import Request
 import pandas as pd
@@ -19,6 +19,8 @@ from fastapi.staticfiles import StaticFiles
 from model.preprocessing import data_load
 from model.model_training import model_training
 from sequence_mining.sequence_mining import sequence_mining
+from optimizer.optimization import SequenceOptimization
+import io
 
 
 
@@ -30,22 +32,55 @@ templates = Jinja2Templates(directory="templates")
 async def landing_page(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
-@app.post("/preprocess", response_class=HTMLResponse)
-async def preprocess(request: Request, data: str = Form(...)):
-    preprocessed_data = data_load(data)
-    preprocessed_data.to_csv('pp_data.csv', index=False)
+@app.get("/upload", response_class=HTMLResponse)
+async def upload_baseline_form(request: Request, response: Response):
 
-@app.post("/model_train", response_class=HTMLResponse)
+    return templates.TemplateResponse("upload.html", {"request": request})
+
+@app.post("/preprocess", response_class=JSONResponse)
+async def preprocess(response: Response, file: UploadFile = File(...)):
+
+    data = f"./uploaded_files/{file.filename}"
+    with open(data, "wb") as f:
+        f.write(file.file.read())
+
+    events, labels = data_load(data)
+    events.to_csv('preprocessed_data/events.csv', index=False)
+    labels.to_csv('preprocessed_data/labels.csv', index=False)
+
+    return {
+        "message": "Done.'"
+    }
+
+@app.get("/model_train", response_class=JSONResponse)
 async def model_train(request: Request):
-    pbp_data = pd.read_csv('pp_data.csv')
-    model_training(pbp_data[0], pbp_data[1])
+    
+    pbp_data = pd.read_csv('preprocessed_data/events.csv')
+    labels = pd.read_csv('preprocessed_data/labels.csv')
+    model_training(pbp_data, labels)
 
-    return templates.TemplateResponse("model_train.html", {
-        "request": request,
-        "training_result": "Model training completed successfully."  
-    })
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png')  
+    buf.seek(0) 
 
-@app.post("/sequence_mining", response_class=HTMLResponse)
-async def sequence_mining(request: Request):
-    pbp_data = pd.read_csv('pp_data.csv')
-    df = sequence_mining("home", "away", pbp_data, "DET","NBA_PBP_2015-16.csv")
+    return StreamingResponse(buf, media_type="image/png")
+
+
+@app.get("/sequence_mining", response_class=HTMLResponse)
+async def seq_min(request: Request):
+    pbp_data = pd.read_csv('preprocessed_data/combined_df.csv')
+    df = sequence_mining("home", "away", pbp_data, "DET")
+    
+    html_table = df.to_html(classes='table table-striped')
+    
+    return HTMLResponse(content=html_table)
+
+@app.get("/optimization", response_class=HTMLResponse)
+async def optimize(request: Request):
+
+    opt = SequenceOptimization('runs_predictor.keras')
+    df = opt.opt_loop('preprocessed_data/events.csv')
+
+    html_table = df.to_html(classes='table table-striped')
+    
+    return HTMLResponse(content=html_table) 

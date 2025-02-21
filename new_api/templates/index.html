@@ -1,22 +1,66 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Team Analysis</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Model Selection</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 50px;
+        }
+        h1 {
+            color: #333;
+        }
+        .button-container {
+            margin-top: 20px;
+        }
+        .button-upload {
+            padding: 15px 30px;
+            font-size: 18px;
+            cursor: pointer;
+            margin: 10px;
+            border: none;
+            border-radius: 5px;
+            color: rgb(196, 47, 47);
+        }
+        .button-train {
+            padding: 15px 30px;
+            font-size: 18px;
+            cursor: pointer;
+            margin: 10px;
+            border: none;
+            border-radius: 5px;
+            color: rgb(47, 122, 196);
+        }
+        .button-seqmin {
+            padding: 15px 30px;
+            font-size: 18px;
+            cursor: pointer;
+            margin: 10px;
+            border: none;
+            border-radius: 5px;
+            color: rgb(73, 122, 62);
+        }
+        .button-opt {
+            padding: 15px 30px;
+            font-size: 18px;
+            cursor: pointer;
+            margin: 10px;
+            border: none;
+            border-radius: 5px;
+            color: rgb(182, 98, 100);
+        }
+    </style>
 </head>
 <body>
-    <h1>Select Your Preferred Team</h1>
-    <form action="/analyze" method="post">
-        <label for="team">Team:</label>
-        <input type="text" id="team" name="team">
-        <input type="text" id="season" name="season">
-        <button type="submit">Analyze</button>
-    </form>
-
-    <h1>Train a model</h1>
-    <form action="/model_train" method="post">
-        <label for="data">Data:</label>
-        <input type="text" id="data" name="data">
-        <button type="submit">Train</button>
-    </form>
+    <h1>Choose an Option</h1>
+    <div class="button-container">
+        <button class="button button-upload" onclick="window.location.href='/upload'">Upload Data</button>
+        <button class="button button-train" onclick="window.location.href='/model_train'">Train Model</button>
+        <button class="button button-seqmin" onclick="window.location.href='/sequence_mining'">Sequence Mining</button>
+        <button class="button button-opt" onclick="window.location.href='/optimization'">Sequence Optimization</button>
+    </div>
 </body>
 </html>

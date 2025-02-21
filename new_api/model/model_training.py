@@ -12,6 +12,7 @@ import os
 import matplotlib.pyplot as plt
 
 def model_training(data, labels):
+    epochs = 2
     X = pd.DataFrame(data)
     X = X.values.reshape(-1,11,10)
     X = X / 255
@@ -32,7 +33,7 @@ def model_training(data, labels):
 
     model.compile(loss="binary_crossentropy", metrics=['accuracy','precision','recall','f1_score'], optimizer='rmsprop')
 
-    history = model.fit(X, y, epochs=20, verbose=1, validation_split=0.2, callbacks=[early_stop])
+    history = model.fit(X, y, epochs=epochs, verbose=1, validation_split=0.2, callbacks=[early_stop])
 
     if not os.path.exists('static'):
         os.makedirs('static')
@@ -43,7 +44,7 @@ def model_training(data, labels):
     plt.subplot(3,2,1)
     plt.plot(history.history['loss'])
     plt.plot(history.history['val_loss'])
-    plt.xticks([i for i in range(0,20)])
+    plt.xticks([i for i in range(epochs)])
     plt.xlabel('epochs')
     plt.ylabel('loss')
     plt.legend(['train','validation'],loc='upper right')
@@ -55,7 +56,7 @@ def model_training(data, labels):
     plt.xlabel('epochs')
     plt.ylabel('accuracy')
     plt.legend(['train','validation'],loc='lower right')
-    plt.xticks([i for i in range(0,20)])
+    plt.xticks([i for i in range(epochs)])
     # plt.savefig('static/plot_accuracy.png')
 
     plt.subplot(3,2,3)
@@ -64,7 +65,7 @@ def model_training(data, labels):
     plt.xlabel('epochs')
     plt.ylabel('precision')
     plt.legend(['train','validation'],loc='lower right')
-    plt.xticks([i for i in range(0,20)])
+    plt.xticks([i for i in range(epochs)])
     # plt.savefig('static/plot_precision.png')
 
     plt.subplot(3,2,4)
@@ -73,7 +74,7 @@ def model_training(data, labels):
     plt.xlabel('epochs')
     plt.ylabel('recall')
     plt.legend(['train','validation'],loc='lower right')
-    plt.xticks([i for i in range(0,20)])
+    plt.xticks([i for i in range(epochs)])
     # plt.savefig('static/plot_recall.png')
 
     plt.subplot(3,2,5)
@@ -82,12 +83,12 @@ def model_training(data, labels):
     plt.xlabel('epochs')
     plt.ylabel('f1_score')
     plt.legend(['train','validation'],loc='lower right')
-    plt.xticks([i for i in range(0,20)])
+    plt.xticks([i for i in range(epochs)])
     # plt.savefig('static/plot_f1_score.png')
 
     plt.tight_layout()  
     plt.savefig('static/model_training_plots.png')
-    plt.close()
+    # plt.close()
 
     # Saves model
     model.save('runs_predictor.keras')

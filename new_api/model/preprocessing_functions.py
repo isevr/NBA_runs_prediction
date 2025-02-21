@@ -4,6 +4,8 @@ import numpy as np
 from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 from warnings import simplefilter
 simplefilter(action='ignore', category=FutureWarning)
+from joblib import dump
+import os
 
 class Preprocessing():
     def __init__(self, data):
@@ -20,14 +22,19 @@ class Preprocessing():
 
     # Label encoding
     def encoders(self):
+
+        os.makedirs('model/encoders', exist_ok=True)
+        
         self.final_df = pd.concat([self.runs_df,self.no_runs_df],ignore_index=True)
         self.encoded_df = pd.DataFrame()
-        encoders = []
+        # encoders = []
 
-        for column in self.final_df.columns[:-1]:
+        for column, i  in zip(self.final_df.columns[:-1], range(len(self.final_df.columns[:-1]))):
             le = LabelEncoder()
-            encoders.append(le)
-            self.encoded_df[column] = le.fit_transform(self.final_df[column])
+            le.fit(self.final_df[column])
+            dump(le,'model/encoders/le_'+str(i)+'_'+column)
+            # encoders.append(le)
+            self.encoded_df[column] = le.transform(self.final_df[column])
 
         # self.encoded_df = pd.concat([self.encoded_df,self.final_df.iloc[:,-1]],axis=1)
         return self.encoded_df
@@ -161,19 +168,17 @@ class Preprocessing():
 
     # Flattening no runs
     def no_runs_optimized(self, data, factors, fact_cols):
-            global no_runs_df
+            # global no_runs_df
             self.no_runs_df = pd.DataFrame([np.append(segment.loc[:, factors].values.ravel(), int(0)) for segment in data])
             self.no_runs_df.columns = fact_cols
             return self.no_runs_df
 
     # Preparing final Dataframe for training
     def final(self):
-        self.scaler = MinMaxScaler((0,255))
-        self.values = pd.DataFrame(self.scaler.fit_transform(self.encoded_df))
+        # self.scaler = MinMaxScaler((0,255))
+        # self.values = pd.DataFrame(self.scaler.fit_transform(self.encoded_df))
+        self.values = self.encoded_df
         self.labels = self.final_df.iloc[:,-1]
-        self.values.to_csv('data.csv')
-        self.labels.to_csv('labels.csv')
-        print(self.values.shape, self.labels.shape)
         return self.values, self.labels
 
     # Run everything
@@ -184,6 +189,7 @@ class Preprocessing():
         self.all_runner()
         self.runs_iter()
         self.no_runs_optimized(self.no_runs_preprocessing(self.data, self.home_runs), self.factors, self.fact_cols)
+        combined_df = pd.concat([self.runs_df,self.no_runs_df],ignore_index=True)
+        combined_df.to_csv('preprocessed_data/combined_df.csv', index=False)
         self.encoders()
-        print(self.encoded_df.shape)
         return self.final()
