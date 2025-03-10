@@ -29,58 +29,48 @@ class SequenceOptimization:
         confidence = (1 / (1 + alpha * loss_value)) * normalized_length
         return confidence
 
-    def opt_loop(self, custom_row, missing_value=np.nan, steps=500):
-        """
-    Process a single basketball game sequence row (1x110).
-    
-    Args:
-    - custom_row: A 1D NumPy array (shape 110,) representing one sequence.
-    - model: The trained TensorFlow model.
-    - missing_value: Placeholder for missing values (NaN, -1, etc.).
-    - steps: Number of optimization steps.
-    
-    Returns:
-    - full_filled: Completed sequence with missing values filled.
-    - prediction: Model prediction for the completed array.
-    - confidence: Confidence score.
-    """
-    
-        # Reshape to (10,11) for processing
-        reshaped_array = custom_row.reshape(10, 11).astype(float)
-
-        # Identify missing positions (NaN or placeholder)
-        missing_mask = np.isnan(reshaped_array) | (reshaped_array == missing_value)
+    def opt_loop(self, partial_sequence, steps=500):
         
-        # Convert known values to TensorFlow tensor
-        known_values = tf.convert_to_tensor(np.nan_to_num(reshaped_array), dtype=tf.float32)
+        partial_len = partial_sequence.shape[0]
 
-        # Initialize missing values as trainable variables
-        x_missing = tf.Variable(known_values, dtype=tf.float32)
+        partial_sequence_reshaped = partial_sequence.reshape(partial_len, 11, 1)
+
+        x_missing = tf.Variable(np.random.rand(10 - partial_len, 11, 1), dtype=tf.float32)
 
         optimizer = tf.optimizers.Adam(learning_rate=0.01)
 
-        # Optimization loop
         for step in range(steps):
             with tf.GradientTape() as tape:
-                loss_value = self.loss(x_missing, x_missing)
+                loss_value = self.loss(partial_sequence_reshaped, x_missing)
 
             grads = tape.gradient(loss_value, [x_missing])
-            
-            if grads[0] is not None:  # Ensure gradients exist
-                optimizer.apply_gradients(zip(grads, [x_missing]))
 
-        # Convert optimized tensor back to NumPy
-        optimized_array = x_missing.numpy()
+            optimizer.apply_gradients(zip(grads, [x_missing]))
 
-        # Fill only missing parts in the original array
-        full_filled = reshaped_array.copy()
-        full_filled[missing_mask] = np.clip(np.round(optimized_array[missing_mask]), 0, 3)
+        missing = np.clip(np.round(x_missing.numpy()), 0, 3)
+                
+        self.full = np.concatenate([partial_sequence_reshaped, missing], axis=0)
 
-        # Prepare for model prediction
-        exp_full = np.expand_dims(full_filled, axis=0)
-        prediction = np.argmax(self.model.predict(exp_full))
+        exp_full = np.expand_dims(self.full, axis=0)
 
-        # Compute confidence
-        confidence = self.confidence_metric(loss_value.numpy(), len(reshaped_array))
+        self.pred = np.argmax(self.model.predict(exp_full))
 
-        return full_filled, prediction, confidence
+        self.confidence = self.confidence_metric(loss_value.numpy(), partial_len)
+        
+        return self.full, self.pred, self.confidence
+    
+    def decode(self, columns):
+
+        full_df = pd.DataFrame(self.full.reshape(-1,110)).astype(int)
+        full_df.columns = columns
+
+        # TODO: add encoders loading
+
+        rules = []
+        for encoder, column in zip(encoders, full_df.columns):
+            rules.append(encoder.inverse_transform(full_df[column])[0])
+
+        generated_rules = pd.DataFrame(rules).T
+        generated_rules.columns = columns
+
+        return generated_rules

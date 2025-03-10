@@ -98,18 +98,12 @@ async def seq_min(request: Request, team: str):
 @app.get("/optimization", response_class=HTMLResponse)
 async def optimize(request: Request):
 
-    arr = np.array([
-    3,0,0,0,0,2,0,1,0,2,0,3,0,2,0,0,2,2,1,0,2,0,2,0,0,1,0,2,2,1,0,2,0,1,0,0,2,0,1,2,1,0,2,0,
-    3,0,0,0,1,2,2,0,0,2,0,2,0,0,1,0,2,2,1,0,2,0,2,0,0,2,0,2,2,1,0,2,2,0,2,0,0,2,0,2,2,1,0,2,
-    2,2,1,0,2,2,0,2,0,0,2,0,2,2,1,0,
-    np.nan,np.nan,np.nan,np.nan,np.nan, np.nan
-]).astype(float)
+    arr = np.random.rand(4,11)
 
     opt = SequenceOptimization('pretrained_models/runs_predictor.keras')
-    df = opt.opt_loop(arr, steps=5)
 
-    print(df)
-    # html_table = df.to_html(classes='table table-striped')
-    
-    # return HTMLResponse(content=html_table) 
+    full_sequence, prediction, confidence = opt.opt_loop(arr, steps=5)
+
+    print(prediction, confidence)
+
     return None
