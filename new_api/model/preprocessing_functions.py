@@ -25,11 +25,13 @@ class Preprocessing():
 
         os.makedirs('model/encoders', exist_ok=True)
         
-        self.final_df = pd.concat([self.runs_df,self.no_runs_df],ignore_index=True)
+        self.final_df = pd.concat([self.runs_df,self.no_runs_df],ignore_index=True).astype('str')
         self.encoded_df = pd.DataFrame()
         # encoders = []
 
         for column, i  in zip(self.final_df.columns[:-1], range(len(self.final_df.columns[:-1]))):
+            # print(self.final_df[column].apply(type).value_counts())
+
             le = LabelEncoder()
             le.fit(self.final_df[column])
             dump(le,'model/encoders/le_'+str(i)+'_'+column)
@@ -190,6 +192,6 @@ class Preprocessing():
         self.runs_iter()
         self.no_runs_optimized(self.no_runs_preprocessing(self.data, self.home_runs), self.factors, self.fact_cols)
         combined_df = pd.concat([self.runs_df,self.no_runs_df],ignore_index=True)
-        combined_df.to_csv('preprocessed_data/combined_df.csv', index=False)
+        # combined_df.to_csv('preprocessed_data/combined_df.csv', index=False)
         self.encoders()
-        return self.final()
+        return self.final(), combined_df

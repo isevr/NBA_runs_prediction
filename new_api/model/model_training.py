@@ -91,4 +91,4 @@ def model_training(data, labels):
     # plt.close()
 
     # Saves model
-    model.save('runs_predictor.keras')
+    model.save('pretrained_models/runs_predictor.keras')

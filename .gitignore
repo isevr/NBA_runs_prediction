@@ -6,6 +6,6 @@ gen_sets/
 images/
 models/
 static/
-
+encoders/
 
 *.csv

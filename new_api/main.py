@@ -40,13 +40,32 @@ async def upload_baseline_form(request: Request, response: Response):
 @app.post("/preprocess", response_class=JSONResponse)
 async def preprocess(response: Response, file: UploadFile = File(...)):
 
-    data = f"./uploaded_files/{file.filename}"
-    with open(data, "wb") as f:
+    teams = ['DET', 'CLE', 'NOP', 'WAS', 'PHI', 'CHI', 'UTA', 'CHO', 'IND',
+       'DEN', 'NYK', 'SAS', 'DAL', 'LAC', 'MIN', 'MEM', 'ATL', 'MIA',
+       'OKC', 'TOR', 'BRK', 'GSW', 'LAL', 'POR', 'PHO', 'SAC', 'HOU',
+       'MIL', 'ORL', 'BOS']
+    
+    data_path = f"./uploaded_files/{file.filename}"
+    with open(data_path, "wb") as f:
         f.write(file.file.read())
 
-    events, labels = data_load(data)
-    events.to_csv('preprocessed_data/events.csv', index=False)
-    labels.to_csv('preprocessed_data/labels.csv', index=False)
+    # # overall
+    # df = pd.read_csv(data_path)
+    # events, labels, combined_df = data_load(df)
+    # events.to_csv('preprocessed_data/events.csv', index=False)
+    # labels.to_csv('preprocessed_data/labels.csv', index=False)
+    # combined_df.to_csv('preprocessed_data/combined_df.csv', index=False)
+
+    # per team
+    for team in teams:
+        df = pd.read_csv(data_path)
+        df = df[df.HomeTeam == team]
+        events_labels, combined_df = data_load(df)
+        events, labels = events_labels
+        os.makedirs('preprocessed_data/'+str(team), exist_ok=True)
+        events.to_csv('preprocessed_data/'+str(team)+'/events.csv', index=False)
+        labels.to_csv('preprocessed_data/'+str(team)+'/labels.csv', index=False)
+        combined_df.to_csv('preprocessed_data/'+str(team)+'/combined_df.csv', index=False)
 
     return {
         "message": "Done.'"
@@ -67,9 +86,10 @@ async def model_train(request: Request):
 
 
 @app.get("/sequence_mining", response_class=HTMLResponse)
-async def seq_min(request: Request):
-    pbp_data = pd.read_csv('preprocessed_data/combined_df.csv')
-    df = sequence_mining("home", "away", pbp_data, "DET")
+async def seq_min(request: Request, team: str):
+    pbp_data = pd.read_csv(f'preprocessed_data/{team}/combined_df.csv')
+
+    df = sequence_mining("home", "away", pbp_data, team)
     
     html_table = df.to_html(classes='table table-striped')
     
@@ -78,9 +98,18 @@ async def seq_min(request: Request):
 @app.get("/optimization", response_class=HTMLResponse)
 async def optimize(request: Request):
 
-    opt = SequenceOptimization('runs_predictor.keras')
-    df = opt.opt_loop('preprocessed_data/events.csv')
+    arr = np.array([
+    3,0,0,0,0,2,0,1,0,2,0,3,0,2,0,0,2,2,1,0,2,0,2,0,0,1,0,2,2,1,0,2,0,1,0,0,2,0,1,2,1,0,2,0,
+    3,0,0,0,1,2,2,0,0,2,0,2,0,0,1,0,2,2,1,0,2,0,2,0,0,2,0,2,2,1,0,2,2,0,2,0,0,2,0,2,2,1,0,2,
+    2,2,1,0,2,2,0,2,0,0,2,0,2,2,1,0,
+    np.nan,np.nan,np.nan,np.nan,np.nan, np.nan
+]).astype(float)
 
-    html_table = df.to_html(classes='table table-striped')
+    opt = SequenceOptimization('pretrained_models/runs_predictor.keras')
+    df = opt.opt_loop(arr, steps=5)
+
+    print(df)
+    # html_table = df.to_html(classes='table table-striped')
     
-    return HTMLResponse(content=html_table) 
+    # return HTMLResponse(content=html_table) 
+    return None
